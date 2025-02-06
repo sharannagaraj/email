@@ -4,10 +4,13 @@ import smtplib
 import socket
 import dns.resolver
 import idna
+import random
+import string
+import os
 from email.utils import parseaddr
 
 app = Flask(__name__)
-app.config["SECRET_KEY"] = "replace_this_with_a_secure_random_string"
+app.config["SECRET_KEY"] = "your-secret-key-here"
 
 def is_valid_domain(domain):
     """Check if the domain format is valid."""
@@ -84,7 +87,7 @@ def email_permutator(first_name, last_name, domain):
         f"{last_name}_{first_name}@{domain}"
     ]
     
-    return list(dict.fromkeys(permutations))  # Remove duplicates while maintaining order
+    return list(dict.fromkeys(permutations))
 
 @app.route("/", methods=["GET", "POST"])
 def index():
@@ -114,22 +117,39 @@ def index():
         
         email_permutations = email_permutator(first_name, last_name, domain)
         
-        accept_all_counter = 0
+        found_valid_email = False
         for email in email_permutations:
             if is_valid_email(email):
                 if is_accept_all_domain(email.split('@')[1]):
-                    results.append({"email": email, "status": "valid but accept-all", "class": "warning"})
-                    accept_all_counter += 1
-                    if accept_all_counter >= 2:
-                        results.append({"email": "Stopping further checking as domain is accept-all.", "status": "info", "class": "info"})
-                        break
+                    results.append({
+                        "email": email,
+                        "status": "Possible email found (domain accepts all emails)",
+                        "class": "warning"
+                    })
                 else:
-                    results.append({"email": email, "status": "valid", "class": "success"})
+                    results.append({
+                        "email": email,
+                        "status": "✓ This is the correct email",
+                        "class": "success"
+                    })
+                    found_valid_email = True
                     break
             else:
-                results.append({"email": email, "status": "invalid", "class": "error"})
+                results.append({
+                    "email": email,
+                    "status": "Invalid",
+                    "class": "error"
+                })
+        
+        if not found_valid_email and not results:
+            results.append({
+                "email": "No valid email address found",
+                "status": "Not Found",
+                "class": "error"
+            })
     
     return render_template("index.html", results=results, error=error, full_name=full_name, domain=domain)
 
 if __name__ == "__main__":
-    app.run(debug=True)
+    port = int(os.environ.get("PORT", 10000))
+    app.run(host='0.0.0.0', port=port)
